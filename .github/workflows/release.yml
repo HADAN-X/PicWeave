@@ -1,0 +1,38 @@
+name: Build and publish Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Publish portable Windows executable
+        run: dotnet publish PicWeave.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+      - name: Package download
+        shell: pwsh
+        run: Compress-Archive -Path publish/PicWeave.exe -DestinationPath PicWeave-Windows-x64.zip -Force
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: PicWeave-Windows-x64.zip
+      - name: Upload build artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicWeave-Windows-x64
+          path: PicWeave-Windows-x64.zip
+          if-no-files-found: error
